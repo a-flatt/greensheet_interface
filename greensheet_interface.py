@@ -2,15 +2,29 @@ import psycopg2
 import openpyxl
 from openpyxl.utils import get_column_letter
 
-def fetchlist(list_len):
+def fetchlist(code_range):
 
-	conn = psycopg2.connect("dbname=testdumpdb user=adamp port=5433 password=Hundredandone1")
+	conn = psycopg2.connect("dbname=buildsoftStandalone user=postgres port=5432")
+	conn.set_session(readonly = True)
 	cur = conn.cursor()
-	cur.execute("SELECT job_id FROM jobs;")
-	list = cur.fetchmany(size=list_len)
+	cur.execute("""
+                SELECT
+					codetext AS costcode,	
+					codes.codedescription,
+					SUM (markeduptotal) AS total
+				FROM 
+					tradeitemrates
+				INNER JOIN tradenodes ON tradenodes.id = tradeitemrates.ownerid
+				INNER JOIN traderatessortcodes ON tradeitemrates.id = traderatessortcodes.rate_id
+				INNER JOIN codes ON traderatessortcodes.codetext = codes.code
+				INNER JOIN groupcodes ON codes.groupid = groupcodes.groupid
+				WHERE tradenodes.jobid = 539 AND groupcodes.groupcode = 'RCC'
+				GROUP BY costcode, codes.codedescription;
+                """)
+	costlist = list(cur.fetchall())
 	cur.close()
 	conn.close()
-	return [row[0] for row in list]
+	return [row for row in costlist if int(row[0]) > code_range[0] and int(row[0]) < code_range[1]]
 
 def adjust_cost_rows(current_sheet, cost_list):
 
@@ -69,8 +83,11 @@ def num_styled_cols(sheet, tgt_range):
 def insert(test_sheet, contents, start_val, finish_val):
 
 	r = find_row_indexes(test_sheet, start_val, finish_val)[0] + 1
-	for item in contents:
-		test_sheet.cell(row = r, column = 1).value = item
+	for row in contents:
+		c = 1
+		for column in row:
+			test_sheet.cell(row = r, column = c).value = column
+			c +=1
 		r +=1
 	   
 def reformat(sheet):
@@ -80,12 +97,12 @@ def reformat(sheet):
 
 def main():
 
-	wb = openpyxl.load_workbook('testproject2.xlsx')
+	wb = openpyxl.load_workbook('testproject.xlsx')
 	sheet = wb.active
 
 	# Retrieve lists from Postgres database. 
-	cost_list = fetchlist(10)
-	labour_list = fetchlist(2)
+	cost_list = fetchlist([1, 59999])
+	labour_list = fetchlist([60000, 69999])
 
 	# Adjust number of rows in spreadsheet to match len() of lists. 
 	adjust_cost_rows(sheet, cost_list)
@@ -98,6 +115,6 @@ def main():
 	# Reformat cells, colours etc. 
 	reformat(sheet)
 
-	wb.save('testproject3.xlsx') 
+	wb.save('testproject1.xlsx') 
 
 main()
