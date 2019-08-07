@@ -1,6 +1,7 @@
 import psycopg2
 import openpyxl
 from openpyxl.utils import get_column_letter
+import greensheet_utils as utils
 import sqlquery
 
 def row_adjust(worksheet, item_list, row_start, row_finish):
@@ -38,8 +39,8 @@ def copy_row(worksheet, tgt_row, src_row):
 	tgt_range = '{}:{}'.format(tgt_row, tgt_row)
 
 	for col in range(1, num_styled_cols(worksheet, tgt_range)):
-		worksheet[formatter(col, row=tgt_row)]._style = worksheet[formatter(col, row=src_row)]._style
-		worksheet[formatter(col, row=tgt_row)].value = worksheet[formatter(col=col, row=src_row)].value
+		worksheet[utils.formatter(col, row=tgt_row)]._style = worksheet[utils.formatter(col, row=src_row)]._style
+		worksheet[utils.formatter(col, row=tgt_row)].value = worksheet[utils.formatter(col=col, row=src_row)].value
 
 def num_styled_cols(worksheet, tgt_range):
 
@@ -54,15 +55,6 @@ def insert(worksheet, item_list, start_ref, finish_ref):
 			worksheet.cell(row = r, column = c).value = column
 			c +=1
 		r +=1
-	   
-def reformat_sheet(worksheet):
-
-	for row in range(1, worksheet.max_row + 1):
-		worksheet.row_dimensions[row].height = 21.0
-
-def formatter(col="", div="", row=""):
-
-	return get_column_letter(col) + div + str(row)
 	
 def main():
 
@@ -73,11 +65,11 @@ def main():
 
 	# Retrieve job_id from workbook to query DB with. 
 
-	job_id = worksheet['A1'].value
+	# job_id = worksheet['A1'].value
 
 	# Retrieve lists from Postgres database. 
-	cost_list = sqlquery.fetchR2([1, 59999], job_id)
-	labour_list = sqlquery.fetchR2([60000, 69999], job_id)
+	cost_list = sqlquery.fetchR2([1, 59999], 'J420')
+	labour_list = sqlquery.fetchR2([60000, 69999], 'J420')
 
 	# Adjust number of rows in spreadworksheet to match len() of lists. 
 	row_adjust(worksheet, cost_list, 'CS', 'CF')
@@ -88,7 +80,7 @@ def main():
 	insert(worksheet, labour_list, 'LS', 'LF')
 
 	# Reformat cells, colours etc. 
-	reformat_sheet(worksheet)
+	utils.reformat_sheet(worksheet)
 
 	wb.save('testproject1.xlsx') 
 
