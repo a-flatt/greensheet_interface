@@ -3,112 +3,92 @@ import openpyxl
 from openpyxl.utils import get_column_letter
 import sqlquery
 
-def adjust_cost_rows(current_sheet, cost_list):
-
-	row_start = 'CS'
-	row_finish = 'CF'
-	row_adjust(current_sheet, cost_list, row_start, row_finish)
+def row_adjust(worksheet, item_list, row_start, row_finish):
 	
-def adjust_labour_rows(current_sheet, labour_list):
+	cur_rowrange = find_row_indexes(worksheet, row_start, row_finish)
+	row_count = cur_rowrange[1] - cur_rowrange[0] - 1
+	req_rows = len(item_list)
+	rows_to_add = req_rows - row_count
+	rows_to_delete = row_count - req_rows
 
-	row_start = 'LS'
-	row_finish = 'LF'
-	row_adjust(current_sheet, labour_list, row_start, row_finish)
-
-def row_adjust(current_sheet, item_list, row_start, row_finish):
-	
-	current_row_range = find_row_indexes(current_sheet, row_start, row_finish)
-	row_count = current_row_range[1] - current_row_range[0] - 1
-	required_rows = len(item_list)
-	rows_to_add = required_rows - row_count
-	rows_to_delete = row_count - required_rows
-
-	if required_rows > row_count:
-		current_sheet.insert_rows(current_row_range[1] - 2, rows_to_add)
-		copy_row_to_rows(current_sheet, current_row_range[0] + 3, current_row_range[0] + 3 + rows_to_add, 11)
-	elif required_rows < row_count:
-		current_sheet.delete_rows(current_row_range[0] + 1, rows_to_delete)
+	if req_rows > row_count:
+		worksheet.insert_rows(cur_rowrange[1] - 2, rows_to_add)
+		copy_row_to_rows(worksheet, cur_rowrange[0] + 3, cur_rowrange[0] + 3 + rows_to_add, 11)
+	elif req_rows < row_count:
+		worksheet.delete_rows(cur_rowrange[0] + 1, rows_to_delete)
 	else:
 		return
 
-def find_row_indexes(current_sheet, start_val, finish_val):
+def find_row_indexes(worksheet, start_val, finish_val):
 
-	for row in current_sheet['A']:
+	for row in worksheet['A']:
 		if row.value == start_val:
 			row_start = row.row
 		elif row.value == finish_val:
 			row_finish = row.row
 	return [row_start, row_finish]
 
-def copy_row_to_rows(sheet, start_row, finish_row, src_row):
+def copy_row_to_rows(worksheet, start_row, finish_row, src_row):
 
 	for row in range(start_row, finish_row + 1):
-		copy_row(sheet, row, src_row)
+		copy_row(worksheet, row, src_row)
 
-def copy_row(sheet, tgt_row, src_row):
+def copy_row(worksheet, tgt_row, src_row):
 
 	tgt_range = '{}:{}'.format(tgt_row, tgt_row)
 
-	for col in range(1, num_styled_cols(sheet, tgt_range)):
-		col_letter = get_column_letter(col)
-		sheet['{}{}'.format(col_letter, tgt_row)]._style = sheet['{}{}'.format(col_letter, src_row)]._style
+	for col in range(1, num_styled_cols(worksheet, tgt_range)):
+		worksheet[formatter(col, row=tgt_row)]._style = worksheet[formatter(col, row=src_row)]._style
+		worksheet[formatter(col, row=tgt_row)].value = worksheet[formatter(col=col, row=src_row)].value
 
-def num_styled_cols(sheet, tgt_range):
+def num_styled_cols(worksheet, tgt_range):
 
-	return len([cell._style for cell in sheet[tgt_range]])
+	return len([cell._style for cell in worksheet[tgt_range]])
 
-def insert(test_sheet, contents, start_val, finish_val):
+def insert(test_worksheet, contents, start_val, finish_val):
 
-	r = find_row_indexes(test_sheet, start_val, finish_val)[0] + 1
+	r = find_row_indexes(test_worksheet, start_val, finish_val)[0] + 1
 	for row in contents:
 		c = 1
 		for column in row:
-			test_sheet.cell(row = r, column = c).value = column
+			test_worksheet.cell(row = r, column = c).value = column
 			c +=1
 		r +=1
 	   
-def reformat(sheet):
+def reformat_sheet(worksheet):
 
-	for row in range(1, sheet.max_row + 1):
-		sheet.row_dimensions[row].height = 21.0
+	for row in range(1, worksheet.max_row + 1):
+		worksheet.row_dimensions[row].height = 21.0
 
-# def copy_formula(sheet, col):
+def formatter(col="", div="", row=""):
 
-# 	""" 
-# 	For use when copy row values in a column.
-# 	"""
-
-# 	i = 0
-# 	for row in sheet[formatter(col)]:		
-# 		sheet[formatter(col=col, row=row.row)].value = sheet[formatter(col=col, row=row.row + i)].value
-# 		i -= 1	
-
-# def formatter(col="", div="", row=""):
-
-# 	return get_column_letter(col) + div + str(row)
+	return get_column_letter(col) + div + str(row)
 	
 def main():
 
-	wb = openpyxl.load_workbook('testproject.xlsx')
-	sheet = wb.active
+	# Open and activate workbook to write to. 
 
-	job_id = sheet['A1'].value
+	wb = openpyxl.load_workbook('testproject.xlsx')
+	worksheet = wb.active
+
+	# Retrieve job_id from workbook to query DB with. 
+
+	job_id = worksheet['A1'].value
 
 	# Retrieve lists from Postgres database. 
 	cost_list = sqlquery.fetchlist([1, 59999], job_id)
 	labour_list = sqlquery.fetchlist([60000, 69999], job_id)
 
-	# Adjust number of rows in spreadsheet to match len() of lists. 
-	adjust_cost_rows(sheet, cost_list)
-	adjust_labour_rows(sheet, labour_list)
+	# Adjust number of rows in spreadworksheet to match len() of lists. 
+	row_adjust(worksheet, cost_list, 'CS', 'CF')
+	row_adjust(worksheet, labour_list, 'LS', 'LF')
 	
-	# Insert retrieved values from database into spreadsheet. 
-	insert(sheet, cost_list, 'CS', 'CF')
-	insert(sheet, labour_list, 'LS', 'LF')
+	# Insert retrieved values from database into spreadworksheet. 
+	insert(worksheet, cost_list, 'CS', 'CF')
+	insert(worksheet, labour_list, 'LS', 'LF')
 
 	# Reformat cells, colours etc. 
-	reformat(sheet)
-	# insert_formulas()
+	reformat_sheet(worksheet)
 
 	wb.save('testproject1.xlsx') 
 
