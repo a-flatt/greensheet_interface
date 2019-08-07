@@ -19,12 +19,12 @@ def row_adjust(worksheet, item_list, row_start, row_finish):
 	else:
 		return
 
-def find_row_indexes(worksheet, start_val, finish_val):
+def find_row_indexes(worksheet, start_ref, finish_ref):
 
 	for row in worksheet['A']:
-		if row.value == start_val:
+		if row.value == start_ref:
 			row_start = row.row
-		elif row.value == finish_val:
+		elif row.value == finish_ref:
 			row_finish = row.row
 	return [row_start, row_finish]
 
@@ -45,13 +45,13 @@ def num_styled_cols(worksheet, tgt_range):
 
 	return len([cell._style for cell in worksheet[tgt_range]])
 
-def insert(test_worksheet, contents, start_val, finish_val):
+def insert(worksheet, item_list, start_ref, finish_ref):
 
-	r = find_row_indexes(test_worksheet, start_val, finish_val)[0] + 1
-	for row in contents:
+	r = find_row_indexes(worksheet, start_ref, finish_ref)[0] + 1
+	for row in item_list:
 		c = 1
 		for column in row:
-			test_worksheet.cell(row = r, column = c).value = column
+			worksheet.cell(row = r, column = c).value = column
 			c +=1
 		r +=1
 	   
@@ -76,8 +76,8 @@ def main():
 	job_id = worksheet['A1'].value
 
 	# Retrieve lists from Postgres database. 
-	cost_list = sqlquery.fetchlist([1, 59999], job_id)
-	labour_list = sqlquery.fetchlist([60000, 69999], job_id)
+	cost_list = sqlquery.fetchR2([1, 59999], job_id)
+	labour_list = sqlquery.fetchR2([60000, 69999], job_id)
 
 	# Adjust number of rows in spreadworksheet to match len() of lists. 
 	row_adjust(worksheet, cost_list, 'CS', 'CF')
